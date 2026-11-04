@@ -426,7 +426,7 @@ def suspend():
     d.set_context("content")
     d.execute_script("window.V().pause()")
     dl0 = downloads()
-    state = "return WebExtensionPolicy.getByID('subtitle-sync-firefox@danielzhang122').extension.backgroundState"
+    state = "return WebExtensionPolicy.getByID('subtitle-sync@danielzhang122').extension.backgroundState"
     stopped = 0
     end = time.time() + 75  # several heartbeats, far longer than the idle limit
     d.set_context("chrome")

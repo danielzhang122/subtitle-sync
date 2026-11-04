@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
   "name": "subtitle-sync",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "description": "Finds, loads and syncs subtitles for videos on any website automatically, including in picture-in-picture.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "subtitle-sync-firefox@danielzhang122",
+      "id": "subtitle-sync@danielzhang122",
       "strict_min_version": "142.0",
       "data_collection_permissions": { "required": ["websiteContent", "authenticationInfo"] }
     }
