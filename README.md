@@ -194,3 +194,7 @@ firefox-extension/   the extension (no build step)
 tools/               package and sign for Firefox
 tests/               packaging tests (pytest); tests/firefox/ = extension tests (Selenium)
 ```
+
+## License
+
+MIT: see [LICENSE](LICENSE). The *Tears of Steel* material in `tests/firefox/fixtures/` and `docs/screenshots/` stays under CC BY 3.0, (c) Blender Foundation | mango.blender.org.
