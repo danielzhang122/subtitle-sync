@@ -1,0 +1,6 @@
+# For the Firefox extension tests (tests/firefox/)
+pytest
+selenium
+httpx
+pysubs2
+numpy

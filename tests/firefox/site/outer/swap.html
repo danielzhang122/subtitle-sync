@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><head><title>Watch Test Show Season 1 Episode 2 Online Free | StreamSite</title></head>
+<body style="background:#111;color:#ddd;font-family:sans-serif"><h1>Test Show</h1>
+<!-- like many streaming sites: the first player reports a video, then is swapped for the real
+     player (a new frame, not yet playing) before the subtitles arrive -->
+<iframe id="player" src="http://127.0.0.1:8767/player-xo.html" width="800" height="470" allowfullscreen allow="fullscreen; picture-in-picture"></iframe>
+<script>
+addEventListener("message", (e) => {
+  if (e.data !== "playing" || document.getElementById("player").dataset.swapped) return;
+  setTimeout(() => {
+    const f = document.createElement("iframe");
+    Object.assign(f, { id: "player", src: "http://127.0.0.1:8767/player-xo.html?real", width: 800, height: 470 });
+    f.dataset.swapped = "1";
+    document.getElementById("player").replaceWith(f);
+  }, 300);
+});
+</script>
+</body></html>

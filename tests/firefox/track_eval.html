@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>subtitle-sync: tracking on a real film</title></head>
+<body>
+<pre id="out">running</pre>
+<script src="../../firefox-extension/content/sync-core.js"></script>
+<script>
+const qs = new URLSearchParams(location.search);
+document.write(`<script src="${qs.get("fixture") || "fixtures/tos.js"}"><\/script>`);
+</script>
+<script>
+// Simulated viewing with tracking on and off: the extension's own estimator, decision rule and timing
+// changes (content/sync-core.js). Each scenario publishes the subtitles wrong in a known way, so the
+// right place for every line is known. Every 5 s: where would the line due right now show, against now?
+const SOUND = (t) => /^\s*(?:(?:\[[^\]]*\]|\([^)]*\)|[♪♫#*\-\s]|<\/?[ib]>)+)\s*$/.test(t);
+const { SyncEstimator, SyncPolicy, offsetAt, offsetNow, applySync } = globalThis.__subsync;
+const B = ENERGY.blockMs, DB = ENERGY.db, END = DB.length * B;
+const SETTLE = 150000; // ms allowed to catch up after locking on or after a cut
+const pct = (a, p) => { const x = [...a].sort((u, v) => u - v); return x.length ? Math.round(x[Math.min(x.length - 1, Math.floor(p * x.length))]) : null; };
+function run({ k = 1, D = 0, cut = null, cutBy = 0 }, T0, track) {
+  // film time m -> published subtitle time
+  const pub = (m) => (m - D - (cut !== null && m >= cut ? cutBy : 0)) / k;
+  const cues = CUES.map((c) => ({ ...c, start: pub(c.start), end: pub(c.end) }));
+  const est = new SyncEstimator();
+  est.setCues(cues, SOUND);
+  const pol = new SyncPolicy(false, { track, ...JSON.parse(qs.get("rules") || "{}") });
+  const tm = { scale: 1, segments: [{ from: 0, offset: 0 }] };
+  let i = Math.floor(T0 / B), lockAt = null, settledFrom = Infinity, lockErr = null;
+  const counts = { rescale: 0, jump: 0, track: 0, fine: 0 }, errs = [], bad = [];
+  for (let now = T0 + 5000; now <= END; now += 5000) {
+    for (; (i + 1) * B <= now && i < DB.length; i++) est.addAudio(i * B, (i + 1) * B, DB[i]);
+    const { action } = pol.step(est, now, Math.round(offsetNow(tm, now)), tm.scale);
+    const errAt = () => { const p = pub(now); return p * tm.scale + offsetAt(tm.segments, p) - now; };
+    const errBefore = errAt();
+    if (action) {
+      applySync(tm, action, now);
+      if (action.kind === "lock") { lockAt = now; settledFrom = now + SETTLE; }
+      else { counts[action.kind]++; if (action.kind === "jump") settledFrom = now + SETTLE; }
+    }
+    if (lockAt === null) continue;
+    const err = errAt();
+    const nearCut = cut !== null && now >= cut && now < cut + SETTLE;
+    if (now >= settledFrom && !nearCut) errs.push(Math.abs(err));
+    // a wrong correction leaves the line over 0.3 s off and further off than before (catching up isn't wrong)
+    if (action && action.kind !== "lock" && !nearCut && Math.abs(err) > 300 && Math.abs(err) > Math.abs(errBefore)) bad.push(`${action.kind} at ${Math.round(now / 1000)} s: ${Math.round(errBefore)} to ${Math.round(err)} ms off`);
+    if (action?.kind === "lock") lockErr = Math.round(Math.abs(err));
+  }
+  return { lock: lockAt === null ? null : (lockAt - T0) / 1000, lockErr, errs, bad, counts };
+}
+setTimeout(() => {
+  const cut = Math.round(END * 0.35);
+  const scenarios = [
+    { name: "steady", D: -2300 },
+    { name: "steady -30 s", D: -30000 },
+    { name: "steady -75 s", D: -75000 },
+    { name: "slip 1.001", k: 1.001, D: 1000 },
+    { name: "slip 0.997", k: 0.997, D: -1000 },
+    { name: "slip 1.003", k: 1.003 },
+    { name: "cut +4 s", D: 500, cut, cutBy: 4000 },
+    { name: "cut -1.5 s", cut, cutBy: -1500 },
+  ];
+  const rows = [];
+  for (const sc of scenarios) for (const track of [false, true]) {
+    const runs = [0, 60000, 120000, 180000].map((T0) => run(sc, T0, track));
+    const errs = runs.flatMap((x) => x.errs);
+    const sum = (key) => runs.reduce((a, x) => a + x.counts[key], 0);
+    rows.push({ name: sc.name, track, locked: runs.filter((x) => x.lock !== null).length, of: runs.length, samples: errs.length,
+      medianErr: pct(errs, 0.5), p90Err: pct(errs, 0.9), worstErr: pct(errs, 1),
+      worstLockErr: Math.max(...runs.map((x) => x.lockErr ?? 0)), bad: runs.flatMap((x) => x.bad), rescales: sum("rescale"), jumps: sum("jump"), steps: sum("track") });
+  }
+  window.RESULT = rows;
+  document.getElementById("out").textContent = rows.map((x) => JSON.stringify(x)).join("\n");
+}, 0);
+</script>
+</body></html>

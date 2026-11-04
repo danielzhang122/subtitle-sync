@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <strong>subtitle-sync</strong>
+    <span id="status-dot"></span>
+    <span id="status-text" class="muted"></span>
+  </header>
+
+  <section id="what">
+    <div class="row"><span id="ident" class="grow"></span><button id="btn-edit" class="link">Edit</button></div>
+    <div id="evidence" class="muted small"></div>
+    <form id="ident-form" hidden>
+      <div class="row">
+        <select id="f-kind"><option value="episode">TV episode</option><option value="movie">Movie</option></select>
+        <input id="f-title" placeholder="Title" class="grow" required>
+      </div>
+      <div class="row">
+        <label class="ep">S <input id="f-season" type="number" min="0" size="3"></label>
+        <label class="ep">E <input id="f-episode" type="number" min="0" size="3"></label>
+        <label class="mv">Year <input id="f-year" type="number" min="1900" max="2100" size="5"></label>
+        <span class="grow"></span>
+        <button id="btn-confirm" type="submit" class="primary">Find subtitles</button>
+      </div>
+    </form>
+  </section>
+
+  <section id="message" hidden></section>
+
+  <section id="controls" hidden>
+    <div class="row">
+      <button id="btn-onoff" title="Show / hide subtitles">On</button>
+      <button id="btn-reset" title="Undo all timing changes (yours and audio sync's) and go back to the subtitle file's own timing">Reset</button>
+      <span class="grow"></span>
+      <button data-nudge="-500" title="Show subtitles 0.5 s earlier">−0.5</button>
+      <button data-nudge="-100" title="Show subtitles 0.1 s earlier">−0.1</button>
+      <span id="offset">+0.00 s</span>
+      <button data-nudge="100" title="Show subtitles 0.1 s later">+0.1</button>
+      <button data-nudge="500" title="Show subtitles 0.5 s later">+0.5</button>
+    </div>
+    <div class="row muted small"><span id="offset-words" class="grow"></span></div>
+    <div class="row muted small"><span id="sync-text" class="grow"></span><button id="btn-auto" class="link" hidden>Use audio sync</button></div>
+    <div class="row small" id="display-note" hidden>This player switches off added subtitle tracks, so the lines are drawn over the video instead. Firefox's picture-in-picture won't show them (use the CC ⧉ subtitle bar for that), and neither will the player's own full-screen button if it makes just the video full screen.</div>
+    <div class="row muted small"><label class="toggle"><input id="tracking" type="checkbox"> Keep tracking the audio and fix any slipping</label></div>
+    <div class="row">
+      <span class="muted small">Text</span>
+      <button id="btn-font-down" title="Smaller">A−</button><span id="font" class="small">100%</span><button id="btn-font-up" title="Larger">A+</button>
+      <span class="muted small">Position</span>
+      <button id="btn-pos-up" title="Higher">▲</button><button id="btn-pos-down" title="Lower">▼</button>
+    </div>
+  </section>
+
+  <section id="subs" hidden>
+    <div class="row"><span class="muted small grow">Subtitle files</span><select id="language" title="Subtitle language"></select></div>
+    <ul id="candidates"></ul>
+  </section>
+
+  <section id="file-row">
+    <button id="btn-file">Load a subtitle file from disk…</button>
+    <input id="file" type="file" accept=".srt,.vtt,.ass,.ssa" hidden>
+  </section>
+
+  <section class="muted small" id="pip-help">
+    Picture-in-picture: use Firefox's PiP button as usual; the subtitles are drawn on the video.
+    For an always-on-top subtitle bar with these controls, click <b>CC ⧉ subtitle bar</b> at the bottom-right of the page.
+  </section>
+
+  <details id="settings">
+    <summary>Settings</summary>
+    <div class="muted small" id="key-help">Need a key? It's free: <a id="link-signup" href="https://www.opensubtitles.com/en/users/sign_up" target="_blank" rel="noopener">make an account</a>, then <a id="link-consumers" href="https://www.opensubtitles.com/en/consumers" target="_blank" rel="noopener">create an API key</a>.</div>
+    <label>OpenSubtitles API key <input id="s-apiKey" placeholder="free from opensubtitles.com → API consumers"></label>
+    <label>OpenSubtitles username (optional, raises the daily limit) <input id="s-username" autocomplete="off"></label>
+    <label>Password <input id="s-password" type="password" autocomplete="off"></label>
+    <label class="check"><input id="s-autoLoad" type="checkbox"> Load subtitles automatically</label>
+    <label class="check"><input id="s-audioSync" type="checkbox"> Sync automatically by listening to the audio (where safe)</label>
+    <label class="check"><input id="s-audioTrack" type="checkbox"> Keep tracking the audio after syncing, and fix any slipping</label>
+    <label class="check"><input id="s-preferHearingImpaired" type="checkbox"> Prefer subtitles for the deaf and hard of hearing</label>
+    <label>API address (advanced) <input id="s-apiBase"></label>
+    <div class="row"><span class="grow"></span><button id="btn-save-settings" class="primary">Save</button></div>
+  </details>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

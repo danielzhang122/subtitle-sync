@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Sync Show S01E03 - MySite</title></head>
+<body style="margin:0;background:#000">
+<!-- Imitates how real players build and treat their video. ?case= picks the behaviour; window.V() is the main video. -->
+<div id="stage"></div>
+<script>
+const qs = new URLSearchParams(location.search);
+const kind = qs.get("case") || "plain";
+const stage = document.getElementById("stage");
+const MAIN = qs.get("src") || "/movie.mp4";
+const video = (src, w = Number(qs.get("w")) || 640, attrs = {}) => {
+  const v = document.createElement("video");
+  if (src) v.src = src;
+  v.style.width = `${w}px`;
+  v.style.display = "block";
+  return Object.assign(v, attrs);
+};
+let main = null;
+window.V = () => main;
+const ownTracks = (fn) => { for (const t of main.textTracks) fn(t); };
+
+function shadow(mode, depth = 1) {
+  let host = stage;
+  for (let i = 0; i < depth; i++) {
+    const h = document.createElement("div");
+    host.append(h);
+    host = h.attachShadow({ mode });
+  }
+  main = video(MAIN);
+  host.append(main);
+}
+
+const cases = {
+  plain() { main = video(MAIN); stage.append(main); },
+  "shadow-open"() { shadow("open"); },
+  "shadow-nested"() { shadow("open", 3); },
+  "shadow-closed"() { shadow("closed"); },
+  "shadow-late"() { setTimeout(() => shadow("closed", 2), 4000); },
+  huge() { // a huge page around a player in shadow DOM
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < 200000; i++) frag.append(document.createElement("span"));
+    const pile = document.createElement("div");
+    pile.style.display = "none";
+    pile.append(frag);
+    document.body.append(pile);
+    shadow("open", 2);
+  },
+  hls() {
+    main = video(null); stage.append(main);
+    const s = document.createElement("script");
+    s.src = "/hls.min.js";
+    s.onload = () => {
+      window.startHls = () => {
+        if (window.hls) window.hls.destroy();
+        window.hls = new Hls({ startLevel: 1 });
+        window.hls.attachMedia(main);
+        window.hls.loadSource("/hls/master.m3u8");
+      };
+      window.startHls();
+      window.hlsReady = true;
+    };
+    document.head.append(s);
+  },
+  "wipe-periodic"() { // every 3 s the player turns off every track it didn't make
+    main = video(MAIN); stage.append(main);
+    setInterval(() => ownTracks((t) => { t.mode = "disabled"; }), 3000);
+  },
+  "wipe-instant"() { // the player reacts to any track change at once (as players with their own captions do)
+    main = video(MAIN); stage.append(main);
+    main.textTracks.addEventListener("change", () => ownTracks((t) => { if (t.mode !== "disabled") t.mode = "disabled"; }));
+  },
+  "wipe-cues"() { // every 3 s the player clears the cues of every track
+    main = video(MAIN); stage.append(main);
+    setInterval(() => ownTracks((t) => { for (const c of [...(t.cues || [])]) t.removeCue(c); }), 3000);
+  },
+  reload() { // the player calls load() (error recovery) and goes back to where it was
+    main = video(MAIN); stage.append(main);
+    window.reloadPlayer = () => {
+      const at = main.currentTime;
+      main.load();
+      main.addEventListener("loadedmetadata", () => { main.currentTime = at; main.play(); }, { once: true });
+    };
+  },
+  "ad-same"() { // the ad and the show play in the same element
+    main = video("/ad.mp4"); stage.append(main);
+    main.addEventListener("ended", () => { main.src = MAIN; main.play(); }, { once: true });
+  },
+  "ad-separate"() { // the ad has its own element, removed when it ends
+    const ad = video("/ad.mp4");
+    stage.append(ad);
+    main = ad;
+    ad.addEventListener("ended", () => { ad.remove(); main = video(MAIN); stage.append(main); main.play(); }, { once: true });
+  },
+  "decoy-hidden"() { // zero-size and hidden videos playing next to the main one
+    for (const style of ["width:0;height:0", "display:none", "visibility:hidden;width:640px", "opacity:0;width:640px;position:absolute;top:0"]) {
+      const d = video("/ad.mp4", 640, { muted: true, loop: true });
+      d.style.cssText = style;
+      stage.append(d);
+      d.play();
+    }
+    main = video(MAIN); stage.append(main);
+  },
+  "decoy-small"() { // a small muted preview loops while the big main video waits for the user
+    const d = video("/ad.mp4", 160, { muted: true, loop: true });
+    stage.append(d);
+    d.play();
+    main = video(MAIN); stage.append(main);
+    window.decoy = d;
+  },
+  iframes() { // a small trailer frame plays first, then the big player frame
+    stage.innerHTML = `<iframe id="small" width="200" height="120" src="/player.html?case=plain&w=180&src=/ad.mp4"></iframe>
+      <iframe id="big" width="800" height="450" src="/player.html?case=plain&w=780"></iframe>`;
+  },
+  readd() { // the player takes its element out of the page for a moment and puts it back
+    main = video(MAIN); stage.append(main);
+    window.takeOut = () => { main.remove(); };
+    window.putBack = () => { stage.append(main); main.play(); };
+  },
+  rebuild() { // the player throws its element away and makes a new one at the same position
+    main = video(MAIN); stage.append(main);
+    window.rebuild = () => {
+      const at = main.currentTime;
+      main.remove();
+      main = video(MAIN); stage.append(main);
+      main.addEventListener("loadedmetadata", () => { main.currentTime = at; main.play(); }, { once: true });
+    };
+  },
+};
+cases[kind]();
+</script>
+</body></html>

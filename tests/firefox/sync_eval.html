@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>subtitle-sync: audio sync on a real film</title></head>
+<body>
+<pre id="out">running</pre>
+<script src="../../firefox-extension/content/sync-core.js"></script>
+<script src="fixtures/tos.js"></script>
+<script>
+// Simulated viewing of a real film (music, effects, sparse dialogue) with the extension's own
+// estimator and decision rule (content/sync-core.js). The subtitles are published off by D ms, so
+// the right answer is D. Viewing starts at T0 and runs to the end; the rule is asked every 5 s,
+// as in the extension. Reports when it first locks on and any change more than 0.3 s wrong.
+const SOUND = (t) => /^\s*(?:(?:\[[^\]]*\]|\([^)]*\)|[♪♫#*\-\s]|<\/?[ib]>)+)\s*$/.test(t);
+const { SyncEstimator, SyncPolicy } = globalThis.__subsync;
+const B = ENERGY.blockMs, DB = ENERGY.db, END = DB.length * B;
+setTimeout(() => {
+  const times = [], errs = [], problems = [];
+  let runs = 0, never = 0;
+  for (const D of [-2300, 4000, -30000]) {
+    const cues = CUES.map((c) => ({ ...c, start: c.start - D, end: c.end - D }));
+    for (let T0 = 0; T0 < END - 240000; T0 += 30000) {
+      runs++;
+      const est = new SyncEstimator();
+      est.setCues(cues, SOUND);
+      const pol = new SyncPolicy(false);
+      let current = 0, lockAt = null, i = Math.floor(T0 / B);
+      for (let now = T0 + 5000; now <= END; now += 5000) {
+        for (; (i + 1) * B <= now && i < DB.length; i++) est.addAudio(i * B, (i + 1) * B, DB[i]);
+        const { action } = pol.step(est, now, current, 1);
+        if (!action) continue;
+        current = action.offset;
+        if (Math.abs(current - D) > 300) problems.push(`D=${D} T0=${T0 / 1000}s: ${action.kind} at ${now / 1000}s is ${current - D} ms off`);
+        if (action.kind === "lock") { lockAt = (now - T0) / 1000; times.push(lockAt); }
+      }
+      if (lockAt === null) never++; else errs.push(Math.abs(current - D));
+    }
+  }
+  times.sort((a, b) => a - b);
+  errs.sort((a, b) => a - b);
+  window.RESULT = { runs, locked: times.length, never, problems, medianLock: times[times.length >> 1], medianErr: errs[errs.length >> 1], worstErr: errs[errs.length - 1] };
+  document.getElementById("out").textContent = JSON.stringify(window.RESULT, null, 1);
+}, 0);
+</script>
+</body></html>

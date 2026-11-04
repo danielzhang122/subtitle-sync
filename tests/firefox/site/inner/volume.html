@@ -1,0 +1,20 @@
+<!DOCTYPE html><html><body><video id="v" src="movie.mp4"></video><script>
+// Does Firefox still apply the element's volume/mute after createMediaElementSource?
+window.measure = async () => {
+  const v = document.getElementById("v");
+  const ctx = new AudioContext(); await ctx.resume();
+  const src = ctx.createMediaElementSource(v); const an = ctx.createAnalyser(); an.fftSize = 2048;
+  src.connect(an); src.connect(ctx.destination);
+  v.currentTime = 10; await v.play();
+  const buf = new Float32Array(2048);
+  // average over 1 s, starting 300 ms after the change (the analyser still holds older audio at first)
+  // every reading covers the same second of audio (seek back first), so only the volume differs
+  const level = async () => { await new Promise(r => { v.addEventListener('seeked', r, {once: true}); v.currentTime = 12.4; }); await new Promise(r => setTimeout(r, 300)); let m = 0; for (let k = 0; k < 40; k++) { await new Promise(r => setTimeout(r, 25)); an.getFloatTimeDomainData(buf); let s = 0; for (const x of buf) s += x * x; m += s / buf.length; } return 10 * Math.log10(m / 40 + 1e-12); };
+  const out = { ctxState: ctx.state };
+  v.volume = 1; out.full = await level();
+  v.volume = 0.1; out.tenth = await level();
+  v.volume = 1; v.muted = true; out.muted = await level();
+  v.muted = false; v.pause();
+  return out;
+};
+</script></body></html>

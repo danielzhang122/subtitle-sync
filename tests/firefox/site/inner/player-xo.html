@@ -1,0 +1,6 @@
+<!DOCTYPE html><html><head><title>player</title></head><body style="margin:0;background:#000">
+<!-- video file from another site (port 8766): the extension must not route its audio -->
+<video id="v" src="http://127.0.0.1:8766/movie.mp4" style="width:100%" muted></video>
+<script>document.getElementById("v").addEventListener("play", () => parent.postMessage("playing", "*"));</script>
+<button id="fs" style="position:absolute;top:4px;left:4px" onclick="document.getElementById('v').requestFullscreen()">fullscreen</button>
+</body></html>
