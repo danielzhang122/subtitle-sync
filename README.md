@@ -2,7 +2,7 @@
 
 A Firefox extension that puts automatic, audio-synced subtitles on videos on any website.
 
-**[Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/subtitle-sync/)**
+**[Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/subtitle-sync/)** (not approved as of Nov 2026)
 
 ![Subtitles on a video](docs/screenshots/video.png)
 
