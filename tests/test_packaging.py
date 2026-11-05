@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO / "tools"))
 import package_firefox  # noqa: E402
 import sign_firefox  # noqa: E402
 
-GUID = "subtitle-sync-firefox@danielzhang122"
+GUID = "subtitle-sync@danielzhang122"
 ISSUER, SECRET = "user:1:23", "test-secret-do-not-print-0123456789"
 
 

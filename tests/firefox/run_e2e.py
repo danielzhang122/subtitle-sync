@@ -473,8 +473,8 @@ try:
     in_frame("document.getElementById('v2').pause()")
     before = httpx.get("http://127.0.0.1:8768/stats").json()["downloads"]
     d.set_context("chrome")
-    bg_state = "return WebExtensionPolicy.getByID('subtitle-sync-firefox@danielzhang122').extension.backgroundState"
-    d.execute_script("WebExtensionPolicy.getByID('subtitle-sync-firefox@danielzhang122').extension.terminateBackground()")
+    bg_state = "return WebExtensionPolicy.getByID('subtitle-sync@danielzhang122').extension.backgroundState"
+    d.execute_script("WebExtensionPolicy.getByID('subtitle-sync@danielzhang122').extension.terminateBackground()")
     stopped = False
     for _ in range(50):
         if d.execute_script(bg_state) == "stopped":

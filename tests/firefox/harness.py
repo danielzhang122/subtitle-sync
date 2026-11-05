@@ -13,7 +13,7 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
 EXT_DIR = Path(__file__).resolve().parents[2] / "firefox-extension"
-EXT_ID = "subtitle-sync-firefox@danielzhang122"
+EXT_ID = "subtitle-sync@danielzhang122"
 UUID = "6a1f6f51-0d6c-4c3e-9a55-5ab5c0a1e001"  # fixed so tests know the moz-extension:// address
 
 

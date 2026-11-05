@@ -2,6 +2,14 @@
 
 A Firefox extension that puts automatic, audio-synced subtitles on videos on any website.
 
+**[Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/subtitle-sync/)** (not approved as of Nov 2026)
+
+![Subtitles on a video](docs/screenshots/video.png)
+
+![The extension's popup](docs/screenshots/popup.png)
+
+<sub>Screenshots use *Tears of Steel*, (CC) Blender Foundation | mango.blender.org, CC BY 3.0.</sub>
+
 When you start a video on a website, the extension:
 
 1. **Works out what's playing.** It reads the page title, structured page data (schema.org),
@@ -186,3 +194,7 @@ firefox-extension/   the extension (no build step)
 tools/               package and sign for Firefox
 tests/               packaging tests (pytest); tests/firefox/ = extension tests (Selenium)
 ```
+
+## License
+
+MIT: see [LICENSE](LICENSE). The *Tears of Steel* material in `tests/firefox/fixtures/` and `docs/screenshots/` stays under CC BY 3.0, (c) Blender Foundation | mango.blender.org.

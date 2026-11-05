@@ -82,7 +82,7 @@ function render() {
     name.textContent = `${c.chosen ? "● " : ""}${c.release || "(unnamed release)"}`;
     const detail = document.createElement("div");
     detail.className = "muted small";
-    detail.textContent = ["OpenSubtitles", c.downloads ? `${c.downloads} downloads` : "",
+    detail.textContent = [c.provider === "file" ? "your file" : "OpenSubtitles", c.downloads ? `${c.downloads} downloads` : "",
       c.hearingImpaired ? "SDH" : "", rejected.has(c.i) ? `skipped: ${rejected.get(c.i)}` : ""].filter(Boolean).join(" · ");
     li.append(name, detail);
     li.onclick = () => act("choose", { index: c.i });
