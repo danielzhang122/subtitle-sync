@@ -65,6 +65,7 @@ async function relocateVideo(s) {
   };
   let answers = await ask();
   if (answers.some((a) => !a.i)) {
+    await browser.scripting.insertCSS({ target: { tabId: s.tabId, allFrames: true }, files: browser.runtime.getManifest().content_scripts[0].css }).catch(() => {});
     await browser.scripting.executeScript({ target: { tabId: s.tabId, allFrames: true }, files: CONTENT_SCRIPTS }).catch(() => {});
     answers = await ask();
   }
@@ -241,7 +242,7 @@ async function load(s, i, cues) {
     timing: timing || null,
     autoSync: settings.audioSync,
     tracking: settings.audioTrack,
-    style: { position: settings.position },
+    style: { position: settings.position, fontSize: settings.fontSize },
   };
   let res = await toFrame(s, msg).catch((err) => ({ error: err.message }));
   // The frame that reported the video can be gone by now (sites swap an ad or placeholder

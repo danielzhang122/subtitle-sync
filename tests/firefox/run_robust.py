@@ -220,6 +220,24 @@ def state_of(target):
     return out
 
 
+def drawn_on_page(name):
+    """Lines must be readable on the page whatever the site does to the track, and the track stays on for PiP."""
+    open_case(name)
+    play()
+    s = showing(name, 25)
+    lines = [(e.start, e.end, e.text.replace("\\N", "\n")) for e in pysubs2.load(str(MEDIA / "good.srt"))]
+    a, b, text = lines[30]
+    d.execute_script("const v = window.V(); v.pause(); v.currentTime = arguments[0]", (a + b) / 2000)
+    time.sleep(1)
+    drawn = d.execute_script(OVERLAY)
+    i = d.execute_script(INFO)
+    r.check(bool(s) and bool(drawn) and drawn["shown"] and drawn["text"] == text and i["mode"] == "showing",
+            f"{name}: the right line is drawn on the page, track still on for PiP (want {text!r}; drawn {drawn}; track {i})")
+    if name == "clipped":
+        frame = d.execute_script("const r = window.V().parentElement.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]")
+        r.check(abs(drawn["rect"][3] - frame[3]) < 2, f"{name}: the line stays inside the part you can see (drawn {drawn['rect']}; frame {frame})")
+
+
 def overlay_case():
     """wipe-instant has just run: lines are drawn over the video. Are they the right ones, and do the controls work?"""
     name = "wipe-instant"
@@ -518,6 +536,7 @@ def soak():
 
 CASES = {
     "shadow-open": lambda: shadow("shadow-open"), "shadow-nested": lambda: shadow("shadow-nested"), "shadow-closed": lambda: shadow("shadow-closed"), "shadow-late": shadow_late, "huge": huge,
+    "cue-hidden": lambda: drawn_on_page("cue-hidden"), "clipped": lambda: drawn_on_page("clipped"),
     "wipe-periodic": lambda: wipe("wipe-periodic", 0.6), "wipe-instant": lambda: (wipe("wipe-instant", 0.6), overlay_case()), "wipe-cues": lambda: wipe("wipe-cues", 0.6),
     "reload": reload_player, "ad-same": lambda: ad("ad-same"), "ad-separate": lambda: ad("ad-separate"),
     "decoy-hidden": decoy_hidden, "decoy-small": decoy_small, "iframes": iframes, "readd": readd, "rebuild": rebuild,

@@ -61,6 +61,17 @@ const cases = {
     };
     document.head.append(s);
   },
+  "cue-hidden"() { // the site's own styles hide whatever Firefox draws for a track
+    const s = document.createElement("style");
+    s.textContent = "video::cue { visibility: hidden !important; }";
+    document.head.append(s);
+    main = video(MAIN); stage.append(main);
+  },
+  clipped() { // the video is taller than the player's frame, and the frame clips it
+    const f = document.createElement("div");
+    f.style.cssText = "width:640px;height:200px;overflow:hidden";
+    main = video(MAIN); f.append(main); stage.append(f);
+  },
   "wipe-periodic"() { // every 3 s the player turns off every track it didn't make
     main = video(MAIN); stage.append(main);
     setInterval(() => ownTracks((t) => { t.mode = "disabled"; }), 3000);
