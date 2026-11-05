@@ -72,15 +72,14 @@
     }
     hidePill();
     const doc = win.document;
-    css(doc.body, { margin: "0", background: "#000", color: "#fff", overflow: "hidden", font: "14px system-ui, sans-serif", height: "100vh" });
+    css(doc.body, { margin: "0", background: "#000", color: "#fff", overflow: "hidden", font: "14px system-ui, sans-serif", height: "100vh", display: "flex", flexDirection: "column" });
     const text = css(doc.createElement("div"), {
-      position: "absolute", inset: "0", display: "flex", alignItems: "center", justifyContent: "center",
+      flex: "1 1 0", minHeight: "0", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
       textAlign: "center", padding: "6px 14px", whiteSpace: "pre-line", lineHeight: "1.25", textShadow: "0 1px 2px #000",
     });
     const panel = css(doc.createElement("div"), {
-      position: "absolute", top: "0", left: "0", right: "0", display: "flex", flexWrap: "wrap", gap: "4px",
-      alignItems: "center", padding: "4px 6px", background: "rgba(26,27,30,.96)", transition: "opacity .2s", opacity: "0",
-      pointerEvents: "none",
+      order: "-1", display: "none", flex: "0 0 auto", flexWrap: "wrap", gap: "4px",
+      alignItems: "center", padding: "4px 6px", background: "rgb(26,27,30)",
     });
     const status = css(doc.createElement("span"), { color: "#8b8f98", fontSize: "11px", marginLeft: "4px" });
     const lang = css(doc.createElement("select"), { font: "12px system-ui", background: "#24262b", color: "#e6e6e6", border: "1px solid #3a3d44", borderRadius: "5px" });
@@ -111,13 +110,15 @@
     );
     doc.body.append(text, panel);
 
-    // controls appear while the pointer is over the bar, then collapse
+    // controls appear while the pointer is over the bar, then collapse. They take their own space, above
+    // the line, which shrinks to fit what's left (see fitText).
     let hideTimer = null;
     const reveal = () => {
-      css(panel, { opacity: "1", pointerEvents: "auto" });
+      if (panel.style.display === "none") { css(panel, { display: "flex" }); fitText(); }
       clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => css(panel, { opacity: "0", pointerEvents: "none" }), 2500);
+      hideTimer = setTimeout(() => { css(panel, { display: "none" }); fitText(); }, 2500);
     };
+    win.addEventListener("resize", fitText);
     doc.addEventListener("mousemove", reveal);
     doc.addEventListener("keydown", (e) => {
       const k = e.key.toLowerCase();
@@ -131,11 +132,20 @@
     render();
   }
 
+  // The chosen text size, or smaller if the line wouldn't fit in the space it has now.
+  function fitText() {
+    if (!bar) return;
+    let size = Math.round(22 * (state?.fontSize || 100) / 100);
+    css(bar.text, { fontSize: `${size}px` });
+    while (size > 12 && bar.text.scrollHeight > bar.text.clientHeight) {
+      size -= 2;
+      css(bar.text, { fontSize: `${size}px` });
+    }
+  }
+
   function render() {
     if (!bar) return;
     const s = state || {};
-    const size = Math.round(22 * (s.fontSize || 100) / 100);
-    css(bar.text, { fontSize: `${size}px` });
     bar.text.textContent = s.barText === false ? "" : (s.enabled === false ? "" : cueText);
     if (s.barText === false) bar.text.textContent = "";
     bar.onoff.textContent = s.enabled === false ? "Off" : "On";
@@ -143,6 +153,7 @@
     if (s.language) bar.lang.value = s.language;
     const sync = s.sync || {};
     const syncText = { locked: s.tracking ? "synced to audio, tracking" : "synced to audio", listening: `listening to audio…${sync.heard ? ` (${sync.heard} s heard)` : ""}`, manual: "manual timing", unavailable: "no audio sync", unsure: "audio didn't match", off: "auto-sync off" }[sync.state] || "";
+    fitText();
     bar.status.textContent = s.loaded ? `${s.label || ""} · ${fmt(s.offset)} · ${syncText}` : (s.message || "no subtitles loaded");
   }
 

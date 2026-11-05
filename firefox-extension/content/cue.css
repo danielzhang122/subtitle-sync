@@ -1,0 +1,7 @@
+/* The extension draws the lines on the page itself (see video.js); this keeps the track invisible there. */
+video[data-subsync-hide-cue]::cue {
+  color: transparent !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  outline: none !important;
+}

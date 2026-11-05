@@ -158,8 +158,9 @@
     }
     st.otherTracks = [...st.video.textTracks].filter((t) => t !== st.track && t.mode === "showing");
     for (const t of st.otherTracks) t.mode = "disabled";
-    st.track.mode = st.enabled && !overlay.on ? "showing" : "disabled";
+    st.track.mode = st.enabled && !trackBlocked ? "showing" : "disabled";
     fill();
+    if (!overlay.on) overlayOn();
     return true;
   }
 
@@ -203,19 +204,23 @@
     forwardCue();
   }
 
-  // Some players switch off, the moment it's on, any track they didn't add. After a few tries, draw the
-  // lines ourselves over the video, with the same timing. Firefox's picture-in-picture only shows
-  // tracks, so these won't appear there; the subtitle bar still gets them.
-  const overlay = { on: false, el: null, line: null, timer: null };
-  let instantOffs = 0;
+  // On the page we draw the lines ourselves, over the video: a site can hide what Firefox draws for a
+  // track (its own styles, a clipped player, or text too large to fit, which Firefox then doesn't show at
+  // all), and nothing tells us it did. The track stays on, invisible on the page (content/cue.css), because
+  // Firefox's picture-in-picture shows the track, and for fullscreen of the bare video, where nothing of
+  // ours can appear above it.
+  // Some players also switch off, the moment it's on, any track they didn't add. After a few tries we
+  // leave it off; picture-in-picture then shows no lines, but the page and the subtitle bar still do.
+  const overlay = { on: false, el: null, line: null, note: null, timer: null };
+  let instantOffs = 0, trackBlocked = false, hiddenOn = null;
 
   function restoreTrack() {
     st.track.mode = "showing";
     forwardCue();
     setTimeout(() => {
-      if (!st.cues.length || !st.enabled || overlay.on || !st.track) return;
+      if (!st.cues.length || !st.enabled || trackBlocked || !st.track) return;
       if (st.track.mode === "showing") { instantOffs = 0; return; }
-      if (++instantOffs >= 3) overlayOn();
+      if (++instantOffs >= 3) { trackBlocked = true; report(); }
       else restoreTrack();
     }, 300);
   }
@@ -226,8 +231,10 @@
     el.dataset.subsyncOverlay = "";
     Object.assign(el.style, { position: "fixed", zIndex: "2147483647", pointerEvents: "none", overflow: "hidden", margin: "0", padding: "0" });
     const line = overlay.line = document.createElement("div");
-    Object.assign(line.style, { position: "absolute", left: "5%", right: "5%", textAlign: "center", transform: "translateY(-100%)", font: "16px system-ui, sans-serif", color: "#fff", whiteSpace: "pre-line", textShadow: "0 0 3px #000" });
-    el.append(line);
+    Object.assign(line.style, { position: "absolute", left: "5%", right: "5%", textAlign: "center", transform: "translateY(-100%)", font: "16px system-ui, sans-serif", color: "#fff", whiteSpace: "pre-line", textShadow: "0 0 2px #000, 0 0 4px #000, 0 1px 3px #000" });
+    const note = overlay.note = document.createElement("div");
+    Object.assign(note.style, { position: "absolute", left: "5%", right: "5%", top: "4%", textAlign: "center", font: "14px system-ui, sans-serif", color: "#fff", textShadow: "0 0 3px #000" });
+    el.append(line, note);
     overlay.timer = setInterval(drawOverlay, 100);
     drawOverlay();
     report();
@@ -236,8 +243,44 @@
   function overlayOff() {
     clearInterval(overlay.timer);
     overlay.el?.remove();
-    Object.assign(overlay, { on: false, el: null, line: null, timer: null });
+    Object.assign(overlay, { on: false, el: null, line: null, note: null, timer: null });
     instantOffs = 0;
+    trackBlocked = false;
+    hideTrackOnPage(null);
+  }
+
+  // Make the track invisible on the page. content/cue.css does it for the page itself; its styles don't
+  // reach inside a player's shadow DOM, so one goes in there too.
+  function hideTrackOnPage(v) {
+    if (hiddenOn === v) return;
+    hiddenOn?.removeAttribute("data-subsync-hide-cue");
+    hiddenOn = v;
+    if (!v) return;
+    v.setAttribute("data-subsync-hide-cue", "");
+    const root = v.getRootNode();
+    if (root !== document && root.querySelector && !root.querySelector("style[data-subsync]")) {
+      const style = document.createElement("style");
+      style.dataset.subsync = "";
+      style.textContent = "video[data-subsync-hide-cue]::cue { color: transparent !important; background: transparent !important; text-shadow: none !important; outline: none !important; }";
+      root.append(style);
+    }
+  }
+
+  // The part of the video that can be seen: players often clip a video larger than their frame.
+  function visibleRect(v) {
+    const r = v.getBoundingClientRect();
+    let { left, top, right, bottom } = r;
+    left = Math.max(left, 0); top = Math.max(top, 0);
+    right = Math.min(right, innerWidth); bottom = Math.min(bottom, innerHeight);
+    const parent = (el) => el.parentElement || el.getRootNode().host || null;
+    for (let el = parent(v), n = 0; el && el !== document.documentElement && n < 30; el = parent(el), n++) {
+      const s = getComputedStyle(el);
+      if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+      const c = el.getBoundingClientRect();
+      if (s.overflowX !== "visible") { left = Math.max(left, c.left); right = Math.min(right, c.right); }
+      if (s.overflowY !== "visible") { top = Math.max(top, c.top); bottom = Math.min(bottom, c.bottom); }
+    }
+    return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : r;
   }
 
   const activeLines = () => {
@@ -252,8 +295,11 @@
     const fs = document.fullscreenElement;
     const parent = fs ? fs.openOrClosedShadowRoot || fs : document.documentElement;
     if (overlay.el.parentNode !== parent) parent.append(overlay.el);
-    const r = v.getBoundingClientRect();
-    Object.assign(overlay.el.style, { display: st.enabled ? "block" : "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    // the bare video in fullscreen: nothing can show above it, so the track shows the lines there
+    const bare = v.getRootNode().fullscreenElement === v;
+    hideTrackOnPage(bare || trackBlocked ? null : v);
+    const r = visibleRect(v);
+    Object.assign(overlay.el.style, { display: st.enabled && !bare ? "block" : "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     Object.assign(overlay.line.style, { top: `${st.position}%`, fontSize: `${Math.max(12, r.height * 0.05) * (st.fontSize || 100) / 100}px` });
     overlay.line.textContent = st.enabled ? activeLines().replace(/<[^>]+>/g, "") : "";
     forwardCue();
@@ -261,8 +307,7 @@
 
   function forwardCue() {
     if (!st.track) return;
-    const text = !st.enabled ? "" : overlay.on ? activeLines() : st.track.mode === "showing"
-      ? [...(st.track.activeCues || [])].filter((c) => c !== notice).map((c) => c.text).join("\n") : "";
+    const text = st.enabled ? activeLines() : "";
     if (text === st.lastCueText) return;
     st.lastCueText = text;
     browser.runtime.sendMessage({ type: "cue", text }).catch(() => {});
@@ -275,8 +320,12 @@
     notice = new VTTCue(t, t + 1.8, text);
     notice.line = 0;
     st.track.addCue(notice);
+    if (overlay.note) overlay.note.textContent = text;
     clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(() => { if (notice) { try { st.track.removeCue(notice); } catch {} notice = null; } }, 1800);
+    noticeTimer = setTimeout(() => {
+      if (overlay.note) overlay.note.textContent = "";
+      if (notice) { try { st.track.removeCue(notice); } catch {} notice = null; }
+    }, 1800);
   }
 
   const fmt = (ms) => `${ms < 0 ? "−" : "+"}${(Math.abs(ms) / 1000).toFixed(2)} s`;
@@ -306,7 +355,7 @@
       sync: st.sync,
       autoSync: st.autoSync,
       tracking: st.tracking,
-      display: overlay.on ? "overlay" : "track",
+      display: trackBlocked ? "overlay" : "track",
       scanMs: Math.round(scanMs),
     };
   }
@@ -480,6 +529,7 @@
         st.tracking = msg.tracking !== false;
         st.manualMode = !!msg.timing?.manualMode && !st.tracking; // tracking keeps a saved shift on top
         st.position = msg.style?.position ?? st.position;
+        st.fontSize = msg.style?.fontSize ?? st.fontSize;
         st.sync = { state: "off", reason: "", offset: 0, score: null, verified: !!msg.timing?.verified };
         if (!attach()) { st.cues = []; return Promise.resolve({ ...state(), error: "no video in this frame" }); }
         showNotice(`subtitle-sync: ${msg.meta?.label || ""}`);
@@ -542,7 +592,7 @@
       case "enable":
         if (!st.cues.length) return;
         st.enabled = msg.enabled;
-        if (st.track) st.track.mode = st.enabled && !overlay.on ? "showing" : "disabled";
+        if (st.track) st.track.mode = st.enabled && !trackBlocked ? "showing" : "disabled";
         drawOverlay();
         for (const t of st.otherTracks) t.mode = st.enabled ? "disabled" : "showing";
         forwardCue();
@@ -562,8 +612,8 @@
     const cur = st.video, best = bestVideo();
     if (takesOver(best)) { attach(); sync.start(); return; }
     if (!cur || !cur.isConnected || !st.track) return;
-    if (overlay.on) {
-      if (st.track.mode === "showing") st.track.mode = "disabled"; // it would show twice
+    if (trackBlocked) {
+      // left off: the player would only switch it off again
     } else if (st.enabled) {
       for (const t of cur.textTracks) {
         if (t === st.track || t.mode !== "showing") continue;
