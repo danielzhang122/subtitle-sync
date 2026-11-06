@@ -1,7 +1,9 @@
 // Top-level page only: a small "CC bar" button, and the always-on-top subtitle bar it opens
-// (Document Picture-in-Picture). The bar shows the current subtitle line, so subtitles stay
-// visible even where Firefox's own PiP window shows the site's captions instead, and holds
-// collapsible controls: on/off, timing, size, position, language, other subtitle versions.
+// (Document Picture-in-Picture). The button sits at the top-right of the page, away from video
+// players' own controls (fullscreen, PiP, volume), which sit along the bottom edge. The bar
+// shows the current subtitle line, so subtitles stay visible even where Firefox's own PiP
+// window shows the site's captions instead, and holds collapsible controls: on/off, timing,
+// size, position, language, other subtitle versions.
 // Firefox only allows opening it from a click in this top-level page (not from inside an
 // embedded player), hence the button. Styles are set through element.style so a site's
 // Content-Security-Policy can't block them.
@@ -38,7 +40,7 @@
     if (!state?.loaded || bar) return hidePill();
     if (!pill) {
       pill = css(document.createElement("div"), {
-        position: "fixed", right: "14px", bottom: "14px", zIndex: "2147483647", transition: "opacity .3s",
+        position: "fixed", right: "14px", top: "14px", zIndex: "2147483647", transition: "opacity .3s",
       });
       const b = button(document, "CC ⧉ subtitle bar", "Open an always-on-top subtitle bar with controls (works alongside picture-in-picture)", openBar);
       css(b, { font: "13px system-ui, sans-serif", padding: "5px 10px", background: "rgba(20,21,24,.9)" });
