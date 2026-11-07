@@ -114,7 +114,7 @@ end), the status says **waiting for the main video** and they load when it start
 **Picture-in-picture**
 - **Firefox's own PiP button:** the subtitles are drawn on the video inside the PiP window.
   This has been tested.
-- **CC ⧉ subtitle bar** (bottom-right of the page when you move the mouse): opens a small
+- **CC ⧉ subtitle bar** (top-right of the page when you move the mouse): opens a small
   always-on-top window that shows the current line. When you hover over it, it shows
   controls: on/off, timing, text size, position, language, and the next subtitle version.
   It also accepts G / H for timing. Use it alongside PiP when you want the controls, or on

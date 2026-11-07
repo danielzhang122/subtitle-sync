@@ -1,0 +1,41 @@
+# Push a tag like v0.2.6 to publish a GitHub release with the extension attached.
+# With repository secrets AMO_JWT_ISSUER and AMO_JWT_SECRET set, it also attaches the
+# Mozilla-signed .xpi, which normal Firefox installs permanently. Without them, only the
+# unsigned zip is attached (load it via about:debugging, or sign it with tools/sign_firefox.py).
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check tag matches manifest version
+        run: |
+          v=$(python -c "import json;print(json.load(open('firefox-extension/manifest.json'))['version'])")
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME != manifest version $v"; exit 1; }
+      - name: Build
+        run: python tools/package_firefox.py
+      - name: Sign with Mozilla (if keys are set)
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -n "$AMO_JWT_ISSUER" ] && [ -n "$AMO_JWT_SECRET" ]; then
+            python tools/sign_firefox.py
+          else
+            echo "No AMO keys set; skipping signing."
+          fi
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.xpi \
+            --title "subtitle-sync $GITHUB_REF_NAME" --generate-notes
