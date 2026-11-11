@@ -6,20 +6,16 @@
 hls.min.js (hls.js, downloaded separately), ad.mp4 (ffmpeg -i movie.mp4 -t 20 -c copy ad.mp4), and hls/master.m3u8
 with hi/ and lo/ variants of movie.mp4. Firefox is muted by the harness. Local pages only.
 """
-import re
 import subprocess
 import sys
-import threading
 import time
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
 import pysubs2
 from selenium.webdriver.common.by import By
 
-from harness import EXT_DIR, Results, ext_storage_set, launch, open_ext
+from harness import EXT_DIR, Results, ext_storage_set, launch, open_ext, serve, wait
 
 HERE = Path(__file__).resolve().parent
 MEDIA, WORK = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
@@ -29,67 +25,7 @@ TRUTH = [(e.start, e.text.replace("\\N", "\n")) for e in pysubs2.load(str(MEDIA 
 BEHIND = 2.3  # good.srt shows every line this many seconds late
 
 
-class Limited:
-    def __init__(self, f, n):
-        self.f, self.n = f, n
-
-    def read(self, k=-1):
-        data = self.f.read(min(self.n, 65536 if k < 0 else k)) if self.n > 0 else b""
-        self.n -= len(data)
-        return data
-
-    def close(self):
-        self.f.close()
-
-
-class Static(SimpleHTTPRequestHandler):
-    roots = [HERE / "site_robust", WORK, MEDIA, EXT_DIR]
-
-    def log_message(self, *a):
-        pass
-
-    def translate_path(self, path):
-        name = path.split("?")[0].lstrip("/")
-        for root in self.roots:
-            if (root / name).is_file():
-                return str(root / name)
-        return str(self.roots[0] / name)
-
-    def send_head(self):
-        path = Path(self.translate_path(self.path))
-        rng = self.headers.get("Range")
-        if not rng or not path.is_file():
-            return super().send_head()
-        size = path.stat().st_size
-        m = re.match(r"bytes=(\d*)-(\d*)", rng)
-        start, end = int(m.group(1) or 0), int(m.group(2)) if m.group(2) else size - 1
-        f = open(path, "rb")
-        f.seek(start)
-        self.send_response(206)
-        self.send_header("Content-Type", self.guess_type(str(path)))
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-        self.send_header("Content-Length", str(end - start + 1))
-        self.end_headers()
-        return Limited(f, end - start + 1)
-
-
-class Quiet(ThreadingHTTPServer):
-    def handle_error(self, request, client_address):
-        pass
-
-
-def wait(fn, timeout=30, every=1.0):
-    end = time.time() + timeout
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(every)
-    return None
-
-
-threading.Thread(target=Quiet(("127.0.0.1", SITE), Static).serve_forever, daemon=True).start()
+serve(SITE, [HERE / "site_robust", WORK, MEDIA, EXT_DIR])
 mock = subprocess.Popen([sys.executable, str(HERE / "mock_opensubtitles.py"), str(API), str(MEDIA)])
 time.sleep(1)
 r = Results()

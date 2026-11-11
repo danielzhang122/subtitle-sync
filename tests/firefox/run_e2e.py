@@ -10,10 +10,7 @@ and a stand-in OpenSubtitles API on 8768. Screenshots go to <media dir>/shots/.
 import re
 import subprocess
 import sys
-import threading
 import time
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
@@ -21,7 +18,7 @@ import pysubs2
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 
-from harness import Results, ext_storage_set, launch, open_ext
+from harness import Results, ext_storage_set, launch, open_ext, serve, wait
 
 HERE = Path(__file__).resolve().parent
 MEDIA = Path(sys.argv[1]).resolve()
@@ -35,83 +32,14 @@ if not (MEDIA / "movie2.mp4").exists():  # a shorter video standing in for a dif
 r = Results()
 
 
-class Static(SimpleHTTPRequestHandler):
-    """Serves the site folder, then the media folder; supports Range requests (video seeking)."""
-    def __init__(self, *a, roots, **k):
-        self.roots = roots
-        super().__init__(*a, directory=str(roots[0]), **k)
-
-    def log_message(self, *a):
-        pass
-
-    def translate_path(self, path):
-        name = path.split("?")[0].lstrip("/") or "index.html"
-        if re.fullmatch(r"embed/tv/\d+/\d+/\d+", name):
-            name = "player-xo.html"  # an embedded player addressed by TMDB id, season, episode
-        for root in self.roots:
-            if (root / name).is_file():
-                return str(root / name)
-        return str(self.roots[0] / name)
-
-    def send_head(self):
-        path = Path(self.translate_path(self.path))
-        rng = self.headers.get("Range")
-        if not rng or not path.is_file():
-            return super().send_head()
-        size = path.stat().st_size
-        m = re.match(r"bytes=(\d*)-(\d*)", rng)
-        start = int(m.group(1) or 0)
-        end = int(m.group(2)) if m.group(2) else size - 1
-        f = open(path, "rb")
-        f.seek(start)
-        self.send_response(206)
-        self.send_header("Content-Type", self.guess_type(str(path)))
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-        self.send_header("Content-Length", str(end - start + 1))
-        self.end_headers()
-        self._remaining = end - start + 1
-        return _Limited(f, end - start + 1)
+def site_file(name):
+    if re.fullmatch(r"embed/tv/\d+/\d+/\d+", name):
+        return "player-xo.html"  # an embedded player addressed by TMDB id, season, episode
+    return name or "index.html"
 
 
-class _Limited:
-    def __init__(self, f, n):
-        self.f, self.n = f, n
-
-    def read(self, k=-1):
-        if self.n <= 0:
-            return b""
-        data = self.f.read(min(self.n, 65536 if k < 0 else k))
-        self.n -= len(data)
-        return data
-
-    def close(self):
-        self.f.close()
-
-
-class QuietServer(ThreadingHTTPServer):
-    def handle_error(self, request, client_address):
-        pass  # the browser cancels video downloads when it seeks; that's normal
-
-
-def serve(port, roots):
-    srv = QuietServer(("127.0.0.1", port), partial(Static, roots=roots))
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    return srv
-
-
-def wait(fn, timeout=30, every=0.5):
-    end = time.time() + timeout
-    while time.time() < end:
-        v = fn()
-        if v:
-            return v
-        time.sleep(every)
-    return None
-
-
-serve(8766, [HERE / "site" / "outer", MEDIA])
-serve(8767, [HERE / "site" / "inner", MEDIA])
+serve(8766, [HERE / "site" / "outer", MEDIA], site_file)
+serve(8767, [HERE / "site" / "inner", MEDIA], site_file)
 mock = subprocess.Popen([sys.executable, str(HERE / "mock_opensubtitles.py"), "8768", str(MEDIA)])
 
 d = launch()
